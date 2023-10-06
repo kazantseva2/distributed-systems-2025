@@ -1,6 +1,9 @@
 package ru.msu.cs.nosql.nosqlapp;
 
+import org.springframework.data.annotation.Id;
+
 public class User {
+    @Id
     private Long id;
     private String name;
 

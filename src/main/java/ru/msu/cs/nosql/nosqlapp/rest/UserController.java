@@ -2,39 +2,36 @@ package ru.msu.cs.nosql.nosqlapp.rest;
 
 import org.springframework.web.bind.annotation.*;
 import ru.msu.cs.nosql.nosqlapp.User;
+import ru.msu.cs.nosql.nosqlapp.repository.UserRepository;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 public class UserController {
 
-    private Map<Long, User> users = new HashMap<>();
-    private long id = 0;
+    private UserRepository userRepository;
+
+    public UserController(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
 
     @GetMapping("/user")
     public List<User> listAllUsers() {
-        return new ArrayList<>(users.values());
+        return userRepository.findAll();
     }
 
     @GetMapping("/user/{id}")
     public User getUserById(@PathVariable("id") Long id) {
-        return users.get(id);
+        return userRepository.findById(id);
     }
 
     @PostMapping("/user")
     public User saveUser(@RequestBody User user) {
-        if (user.getId() == null) {
-            user.setId(id++);
-        }
-        users.put(user.getId(), user);
-        return user;
+        return userRepository.save(user);
     }
 
     @DeleteMapping("/user/{id}")
     public void deleteUser(@PathVariable("id") Long id) {
-        users.remove(id);
+        userRepository.deleteUser(id);
     }
 }
