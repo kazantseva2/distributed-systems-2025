@@ -3,9 +3,8 @@ package ru.msu.cs.nosql.nosqlapp.repository;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
-import ru.msu.cs.nosql.nosqlapp.model.User;
+import ru.msu.cs.nosql.nosqlapp.User;
 
 import java.util.List;
 
@@ -18,7 +17,7 @@ public class UserRepository {
         this.mongoTemplate = mongoTemplate;
     }
 
-    public User findById(String id) {
+    public User findById(Long id) {
         return mongoTemplate.findById(id, User.class, COLLECTION_NAME);
     }
 
@@ -31,14 +30,8 @@ public class UserRepository {
         return mongoTemplate.find(query, User.class, COLLECTION_NAME);
     }
 
-    public void deleteUser(String id) {
+    public void deleteUser(Long id) {
         mongoTemplate.remove(Query.query(new Criteria("_id").is(id)), User.class, COLLECTION_NAME);
     }
 
-    // Увеличить счётчик отзывов
-    public void incrementReviewCount(String userId) {
-        Query query = Query.query(Criteria.where("_id").is(userId));
-        Update update = new Update().inc("reviewsCount", 1);
-        mongoTemplate.updateFirst(query, update, COLLECTION_NAME);
-    }
 }
