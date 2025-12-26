@@ -15,6 +15,9 @@ public class Review {
     private Date date;
     private ModerationStatus moderationStatus;
 
+    public Review() {
+    }
+
     public Review(String id, String productId, String userId, int rating, String title, String text, Date date, ModerationStatus moderationStatus) {
         this.id = id;
         this.productId = productId;

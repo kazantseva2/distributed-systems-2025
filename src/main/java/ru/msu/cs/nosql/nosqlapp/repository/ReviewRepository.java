@@ -84,4 +84,9 @@ public class ReviewRepository {
         Update update = new Update().set("moderationStatus", status);
         mongoTemplate.updateFirst(query, update, Review.class, COLLECTION_NAME);
     }
+
+    public void deleteAll() {
+        mongoTemplate.dropCollection(COLLECTION_NAME); // удаляет коллекцию полностью
+    }
+
 }

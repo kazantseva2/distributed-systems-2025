@@ -1,4 +1,4 @@
-package ru.msu.cs.nosql.nosqlapp.repository;
+package ru.msu.cs.nosql.nosqlapp.repository_example;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.search.Hit;
@@ -10,9 +10,7 @@ import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.elasticsearch.client.RestClient;
-import org.elasticsearch.client.RestClientBuilder;
 import org.springframework.stereotype.Repository;
 import ru.msu.cs.nosql.nosqlapp.User;
 

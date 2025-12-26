@@ -41,4 +41,8 @@ public class UserRepository {
         Update update = new Update().inc("reviewsCount", 1);
         mongoTemplate.updateFirst(query, update, COLLECTION_NAME);
     }
+
+    public void deleteAll() {
+        mongoTemplate.dropCollection(COLLECTION_NAME);
+    }
 }

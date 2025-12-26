@@ -72,4 +72,8 @@ public class ProductRepository {
         return mongoTemplate.find(query, Product.class, COLLECTION_NAME);
     }
 
+    public void deleteAll() {
+        mongoTemplate.dropCollection(COLLECTION_NAME);
+    }
+
 }
