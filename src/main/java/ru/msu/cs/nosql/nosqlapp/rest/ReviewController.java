@@ -5,6 +5,7 @@ import ru.msu.cs.nosql.nosqlapp.model.RatingOperator;
 import ru.msu.cs.nosql.nosqlapp.model.Review;
 import ru.msu.cs.nosql.nosqlapp.repository.CachedProductRepository;
 import ru.msu.cs.nosql.nosqlapp.repository.ElasticReviewRepository;
+import ru.msu.cs.nosql.nosqlapp.repository.RateLimitExceededException;
 import ru.msu.cs.nosql.nosqlapp.repository.ReviewRepository;
 
 import java.util.List;
@@ -37,17 +38,13 @@ public class ReviewController {
 
     @PostMapping
     public Review saveReview(@RequestBody Review review) {
-        // Проверка rate-limiting по userId
         String userId = review.getUserId();
-        if (!cachedProductRepository.checkRateLimit(userId, 5)) { // максимум 5 отзывов в минуту
-            throw new RuntimeException("Rate limit exceeded for user: " + userId);
+        if (!cachedProductRepository.checkRateLimit(userId, 5)) {
+            throw new RateLimitExceededException("Rate limit exceeded for user: " + userId);
         }
 
-        // Сохраняем отзыв
         Review savedReview = reviewRepository.save(review);
         elasticReviewRepository.save(savedReview);
-
-        // Обновляем агрегированный рейтинг товара
         updateProductAggregatedRating(review.getProductId());
 
         return savedReview;

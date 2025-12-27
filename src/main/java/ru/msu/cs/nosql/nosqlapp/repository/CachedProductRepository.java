@@ -17,7 +17,7 @@ public class CachedProductRepository {
     private final IMap<String, Product> productCache;
     private final IMap<String, Object> lockMap;
     private final IMap<String, AggregatedRating> ratingCache;
-    private final IMap<String, Long> rateLimitMap; // rate limiting по userId
+    private final IMap<String, RateLimit> rateLimitMap; // rate limiting по userId
     private final ITopic<String> productUpdateTopic;
 
     public CachedProductRepository(ProductRepository productRepository, HazelcastInstance hazelcastInstance) {
@@ -38,14 +38,14 @@ public class CachedProductRepository {
     }
 
     public Product saveProduct(Product product) {
-        lockMap.lock(product.getId(), 10, TimeUnit.SECONDS);
+        Product saved = productRepository.save(product); // ID теперь точно есть
+        lockMap.lock(saved.getId(), 10, TimeUnit.SECONDS);
         try {
-            Product updated = productRepository.save(product);
-            productCache.put(updated.getId(), updated);
-            productUpdateTopic.publish(product.getId());
-            return updated;
+            productCache.put(saved.getId(), saved);
+            productUpdateTopic.publish(saved.getId());
+            return saved;
         } finally {
-            lockMap.unlock(product.getId());
+            lockMap.unlock(saved.getId());
         }
     }
 
@@ -81,20 +81,51 @@ public class CachedProductRepository {
     }
 
     public boolean checkRateLimit(String userId, int maxReviewsPerMinute) {
-        long now = System.currentTimeMillis();
         rateLimitMap.lock(userId);
         try {
-            Long lastTimestamp = rateLimitMap.get(userId);
-            if (lastTimestamp == null || now - lastTimestamp > TimeUnit.MINUTES.toMillis(1)) {
-                rateLimitMap.put(userId, now, 1, TimeUnit.MINUTES); // TTL 1 минута
+            RateLimit rate = rateLimitMap.get(userId);
+            long now = System.currentTimeMillis();
+
+            if (rate == null || now - rate.getFirstRequestTimestamp() > 60_000) {
+                // первый отзыв или прошла минута — сброс
+                rateLimitMap.put(userId, new RateLimit(1, now));
                 return true;
-            } else {
-                return false; // превышен лимит
             }
+
+            if (rate.getCount() < maxReviewsPerMinute) {
+                rate.setCount(rate.getCount() + 1);
+                rateLimitMap.put(userId, rate);
+                return true;
+            }
+
+            // лимит превышен
+            return false;
+
         } finally {
             rateLimitMap.unlock(userId);
         }
     }
+
+    public static class RateLimit implements java.io.Serializable {
+        private int count;
+        private long firstRequestTimestamp;
+
+        public RateLimit(int count, long firstRequestTimestamp) {
+            this.count = count;
+            this.firstRequestTimestamp = firstRequestTimestamp;
+        }
+
+        public int getCount() { return count; }
+        public void setCount(int count) { this.count = count; }
+
+        public long getFirstRequestTimestamp() { return firstRequestTimestamp; }
+        public void setFirstRequestTimestamp(long ts) { this.firstRequestTimestamp = ts; }
+    }
+
+    public void clearRateLimit() {
+        rateLimitMap.clear();
+    }
+
 
     public static class AggregatedRating {
         private double avgRating;
@@ -113,4 +144,7 @@ public class CachedProductRepository {
             return countReviews;
         }
     }
+
+
 }
+

@@ -46,31 +46,6 @@ public class ProductRepository {
         mongoTemplate.updateFirst(query, update, Product.class, COLLECTION_NAME);
     }
 
-    // Найти товары по рейтингу
-    public List<Product> findByRating(Double rating, RatingOperator ratingOp) {
-        if (rating == null || ratingOp == null) {
-            return findAll();
-        }
-
-        Criteria criteria;
-        switch (ratingOp) {
-            case EQ:
-                criteria = Criteria.where("aggregatedRating").is(rating);
-                break;
-            case GTE:
-                criteria = Criteria.where("aggregatedRating").gte(rating);
-                break;
-            case LTE:
-                criteria = Criteria.where("aggregatedRating").lte(rating);
-                break;
-            default:
-                throw new IllegalArgumentException("Unknown RatingOperator: " + ratingOp);
-        }
-
-        Query query = Query.query(criteria);
-        return mongoTemplate.find(query, Product.class, COLLECTION_NAME);
-    }
-
     public void deleteAll() {
         mongoTemplate.dropCollection(COLLECTION_NAME);
     }

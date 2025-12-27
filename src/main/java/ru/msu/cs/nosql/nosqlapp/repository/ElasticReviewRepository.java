@@ -173,7 +173,7 @@ public class ElasticReviewRepository {
             var response = esClient.search(s -> s
                             .index(INDEX_NAME)
                             .size(1000) // Ограничиваем для производительности
-                            .query(q -> q.range(r -> r.field("rating").lte(JsonData.of(3)))),
+                            .query(q -> q.range(r -> r.field("rating").lte(JsonData.of(2)))),
                     Review.class
             );
 
