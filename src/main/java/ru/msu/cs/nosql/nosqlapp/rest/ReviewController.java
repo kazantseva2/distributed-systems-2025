@@ -3,6 +3,7 @@ package ru.msu.cs.nosql.nosqlapp.rest;
 import org.springframework.web.bind.annotation.*;
 import ru.msu.cs.nosql.nosqlapp.model.RatingOperator;
 import ru.msu.cs.nosql.nosqlapp.model.Review;
+import ru.msu.cs.nosql.nosqlapp.repository.CachedProductRepository;
 import ru.msu.cs.nosql.nosqlapp.repository.ElasticReviewRepository;
 import ru.msu.cs.nosql.nosqlapp.repository.ReviewRepository;
 
@@ -14,10 +15,14 @@ import java.util.Map;
 public class ReviewController {
     private ReviewRepository reviewRepository;
     private final ElasticReviewRepository elasticReviewRepository;
+    private final CachedProductRepository cachedProductRepository;
 
-    public ReviewController(ReviewRepository reviewRepository, ElasticReviewRepository elasticReviewRepository) {
+    public ReviewController(ReviewRepository reviewRepository,
+                            ElasticReviewRepository elasticReviewRepository,
+                            CachedProductRepository cachedProductRepository) {
         this.reviewRepository = reviewRepository;
         this.elasticReviewRepository = elasticReviewRepository;
+        this.cachedProductRepository = cachedProductRepository;
     }
 
     @GetMapping
@@ -32,15 +37,41 @@ public class ReviewController {
 
     @PostMapping
     public Review saveReview(@RequestBody Review review) {
+        // Проверка rate-limiting по userId
+        String userId = review.getUserId();
+        if (!cachedProductRepository.checkRateLimit(userId, 5)) { // максимум 5 отзывов в минуту
+            throw new RuntimeException("Rate limit exceeded for user: " + userId);
+        }
+
+        // Сохраняем отзыв
         Review savedReview = reviewRepository.save(review);
         elasticReviewRepository.save(savedReview);
+
+        // Обновляем агрегированный рейтинг товара
+        updateProductAggregatedRating(review.getProductId());
+
         return savedReview;
+    }
+
+    private void updateProductAggregatedRating(String productId) {
+        List<Review> reviews = reviewRepository.findByProductId(productId);
+        double avgRating = reviews.stream().mapToInt(Review::getRating).average().orElse(0.0);
+        int countReviews = reviews.size();
+
+        cachedProductRepository.updateAggregatedRating(productId, avgRating, countReviews);
     }
 
     @DeleteMapping("/{id}")
     public void deleteReview(@PathVariable("id") String id) {
-        reviewRepository.deleteReview(id);
-        elasticReviewRepository.deleteById(id);
+        Review review = reviewRepository.findById(id);
+        if (review != null) {
+            reviewRepository.deleteReview(id);
+            elasticReviewRepository.deleteById(id);
+
+            // Пересчет агрегированного рейтинга
+            updateProductAggregatedRating(review.getProductId());
+        }
+
     }
 
     @GetMapping("/search")

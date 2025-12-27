@@ -13,15 +13,20 @@ public class CachedProductRepository {
 
     private final ProductRepository productRepository;
     private final HazelcastInstance hazelcastInstance;
-    private final IMap<String, Product> cacheMap;
-    private final IMap<String, Product> lockMap;
+
+    private final IMap<String, Product> productCache;
+    private final IMap<String, Object> lockMap;
+    private final IMap<String, AggregatedRating> ratingCache;
+    private final IMap<String, Long> rateLimitMap; // rate limiting по userId
     private final ITopic<String> productUpdateTopic;
 
     public CachedProductRepository(ProductRepository productRepository, HazelcastInstance hazelcastInstance) {
         this.productRepository = productRepository;
         this.hazelcastInstance = hazelcastInstance;
-        this.cacheMap = hazelcastInstance.getMap("product");
+        this.productCache = hazelcastInstance.getMap("product");
         this.lockMap = hazelcastInstance.getMap("lockedProduct");
+        this.ratingCache = hazelcastInstance.getMap("aggregatedRating");
+        this.rateLimitMap = hazelcastInstance.getMap("rateLimit");
         this.productUpdateTopic = hazelcastInstance.getTopic("product_update_topic");
 
         productUpdateTopic.addMessageListener(message ->
@@ -29,40 +34,83 @@ public class CachedProductRepository {
     }
 
     public Product getProductById(String productId) {
-        return cacheMap.computeIfAbsent(productId, id -> productRepository.findById(id));
+        return productCache.computeIfAbsent(productId, productRepository::findById);
     }
 
     public Product saveProduct(Product product) {
         lockMap.lock(product.getId(), 10, TimeUnit.SECONDS);
-        Product updatedProduct;
         try {
-            updatedProduct = productRepository.save(product);
-            cacheMap.put(updatedProduct.getId(), updatedProduct);
+            Product updated = productRepository.save(product);
+            productCache.put(updated.getId(), updated);
             productUpdateTopic.publish(product.getId());
+            return updated;
         } finally {
             lockMap.unlock(product.getId());
         }
-        return updatedProduct;
     }
 
     public void deleteProduct(String productId) {
         productRepository.deleteProduct(productId);
-        cacheMap.delete(productId);
+        productCache.delete(productId);
+        ratingCache.delete(productId);
     }
 
     public void updateAggregatedRating(String productId, double avgRating, int countReviews) {
         lockMap.lock(productId, 10, TimeUnit.SECONDS);
         try {
             productRepository.updateAggregatedRating(productId, avgRating, countReviews);
-            Product cached = cacheMap.get(productId);
+
+            AggregatedRating agg = new AggregatedRating(avgRating, countReviews);
+            ratingCache.put(productId, agg);
+
+            Product cached = productCache.get(productId);
             if (cached != null) {
                 cached.setAggregatedRating(avgRating);
                 cached.setCountReviews(countReviews);
-                cacheMap.put(productId, cached);
+                productCache.put(productId, cached);
             }
+
             productUpdateTopic.publish(productId);
         } finally {
             lockMap.unlock(productId);
+        }
+    }
+
+    public AggregatedRating getAggregatedRating(String productId) {
+        return ratingCache.get(productId);
+    }
+
+    public boolean checkRateLimit(String userId, int maxReviewsPerMinute) {
+        long now = System.currentTimeMillis();
+        rateLimitMap.lock(userId);
+        try {
+            Long lastTimestamp = rateLimitMap.get(userId);
+            if (lastTimestamp == null || now - lastTimestamp > TimeUnit.MINUTES.toMillis(1)) {
+                rateLimitMap.put(userId, now, 1, TimeUnit.MINUTES); // TTL 1 минута
+                return true;
+            } else {
+                return false; // превышен лимит
+            }
+        } finally {
+            rateLimitMap.unlock(userId);
+        }
+    }
+
+    public static class AggregatedRating {
+        private double avgRating;
+        private int countReviews;
+
+        public AggregatedRating(double avgRating, int countReviews) {
+            this.avgRating = avgRating;
+            this.countReviews = countReviews;
+        }
+
+        public double getAvgRating() {
+            return avgRating;
+        }
+
+        public int getCountReviews() {
+            return countReviews;
         }
     }
 }

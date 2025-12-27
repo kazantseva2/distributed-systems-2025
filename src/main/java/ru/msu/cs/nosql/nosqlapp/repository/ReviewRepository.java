@@ -1,14 +1,11 @@
 package ru.msu.cs.nosql.nosqlapp.repository;
 
-
-import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 import ru.msu.cs.nosql.nosqlapp.model.ModerationStatus;
-import ru.msu.cs.nosql.nosqlapp.model.RatingOperator;
 import ru.msu.cs.nosql.nosqlapp.model.Review;
 
 import java.util.List;
@@ -39,33 +36,8 @@ public class ReviewRepository {
         mongoTemplate.remove(Query.query(new Criteria("_id").is(id)), Review.class, COLLECTION_NAME);
     }
 
-    // Найти отзывы по товару с фильтрацией
-    public List<Review> findByFilters(String productId, Integer rating, RatingOperator ratingOp, Boolean hasText, String sortBy, int limit) {
-        Criteria criteria = Criteria.where("productId").is(productId)
-                .and("moderationStatus").is(ModerationStatus.APPROVED);
-
-        if (rating != null && ratingOp != null) {
-            switch (ratingOp) {
-                case EQ:
-                    criteria = criteria.and("rating").is(rating);
-                    break;
-                case GTE:
-                    criteria = criteria.and("rating").gte(rating);
-                    break;
-                case LTE:
-                    criteria = criteria.and("rating").lte(rating);
-                    break;
-            }
-        }
-
-        if (hasText != null && hasText) {
-            criteria = criteria.and("text").ne(null).ne("");
-        }
-
-        Query query = new Query(criteria)
-                .limit(limit)
-                .with(Sort.by(Sort.Direction.DESC, sortBy != null ? sortBy : "date"));
-
+    public List<Review> findByProductId(String productId) {
+        Query query = Query.query(Criteria.where("productId").is(productId));
         return mongoTemplate.find(query, Review.class, COLLECTION_NAME);
     }
 

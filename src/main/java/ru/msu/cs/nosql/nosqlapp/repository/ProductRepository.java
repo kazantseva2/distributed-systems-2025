@@ -8,7 +8,6 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 import ru.msu.cs.nosql.nosqlapp.model.Product;
 import ru.msu.cs.nosql.nosqlapp.model.RatingOperator;
-import ru.msu.cs.nosql.nosqlapp.model.Review;
 
 import java.util.List;
 
